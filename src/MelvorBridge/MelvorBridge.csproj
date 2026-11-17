@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MelvorBridge</AssemblyName>
+    <RootNamespace>MelvorBridge</RootNamespace>
+    <!-- 桥在游戏进程内运行，不打包运行时 -->
+    <SelfContained>false</SelfContained>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- 禁用生成 startuphook 之外不需要的东西 -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- 编译期引用游戏自带 GodotSharp（保证 ABI 一致），运行时由游戏进程提供 -->
+  <ItemGroup>
+    <Reference Include="GodotSharp">
+      <HintPath>$(GodotSharpPath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
