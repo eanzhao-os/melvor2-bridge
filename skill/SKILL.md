@@ -72,6 +72,33 @@ curl -s -m 3 http://127.0.0.1:27500/health
 - 上限等级 99；放置游戏——**离线也在结算收益**，切目标随时可逆，所以不必急，先和玩家商量清楚
 - 放置游戏的节奏：玩家选定目标挂着，隔段时间回来一起复盘、调整路线；你负责算账和提醒（比如快到新解锁了），路线由玩家定
 
+## 界面语言（官方中文）
+
+游戏 PCK 内置了 `res://Locale/zh_CN.po`（另有 `fr.po`），但 `project.godot` 默认只注册 `en_GB.po`，所以界面默认是英文。
+
+**查询/切换（桥在线时，立即生效无需重启）：**
+```bash
+curl -s http://127.0.0.1:27500/language
+# → {"current":"zh_CN","loadedLocales":["en_GB","zh_CN","en"]}
+
+curl -s -X POST -d '{"locale":"zh_CN"}' http://127.0.0.1:27500/language   # 切中文
+curl -s -X POST -d '{"locale":"en_GB"}' http://127.0.0.1:27500/language   # 切回英文
+curl -s -X POST -d '{"locale":""}'       http://127.0.0.1:27500/language   # 自动（跟随系统语言）
+```
+或用 CLI：`python melvor.py lang`（查询）/ `python melvor.py lang zh_CN`（切换）。
+玩家要求"调成中文/换语言"时直接用上面的命令；切换前简单告知玩家即可。
+
+**若 `loadedLocales` 里没有 `zh_CN`**（新装机器常见——翻译没注册）：
+在 `%APPDATA%/Games By Malcs/Melvor Idle 2/device_settings/override.cfg` 追加（保留文件已有的 `[display]` 等节）：
+```ini
+[internationalization]
+
+locale/translations=PackedStringArray("res://Locale/en_GB.po", "res://Locale/zh_CN.po", "res://Locale/fr.po")
+```
+然后重启游戏。`Language` 为空（自动）时跟随系统语言，无需再手动设置。
+
+**验证**：`GET /state` 的技能名变为中文（伐木/采矿/钓鱼…）即已生效。
+
 ## 一轮协作怎么走
 
 1. **看局面**：`GET /state`，用一两句话告诉玩家现状（等级、在做什么）
