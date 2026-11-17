@@ -136,6 +136,23 @@ public static class Server
                     return name != null ? Handlers.ReadPackage(name) : (object)Handlers.ListPackages();
                 }
 
+            case "/language":
+                {
+                    var p = ParseBody(body);
+                    return p.Count == 0 || p.TryGetValue("locale", out var _) == false
+                        ? Handlers.LanguageInfo()
+                        : Handlers.SetLanguage(S(p, "locale") ?? "");
+                }
+
+            case "/dir":
+                return Handlers.ListDir(q.Get("path") ?? "res://");
+
+            case "/project-setting":
+                {
+                    var name = q.Get("name") ?? throw new ArgumentException("name required");
+                    return Handlers.ReadProjectSetting(name);
+                }
+
             case "/bridge-log":
                 {
                     int n = int.TryParse(q.Get("n"), out var v) ? v : 50;
@@ -384,6 +401,67 @@ public static class Handlers
             var stop = am.GetType().GetMethod("TryStopActive", new[] { typeof(bool) })!;
             var ok = (bool)stop.Invoke(am, new object[] { true })!;
             return Server.Dict(("ok", ok));
+        });
+    }
+
+    // ---------- 运行时文件系统/项目设置（PCK 在运行时目录已解密） ----------
+
+    public static object ListDir(string path)
+    {
+        var outList = new List<string>();
+        GameContext.RunOnMainThread(() =>
+        {
+            var dir = Godot.DirAccess.Open(path);
+            if (dir == null) return;
+            dir.ListDirBegin();
+            while (dir.GetNext() is { } f && f.Length > 0) outList.Add(f);
+            dir.ListDirEnd();
+        });
+        return Server.Dict(("path", path), ("entries", outList));
+    }
+
+    public static object ReadProjectSetting(string name)
+    {
+        return GameContext.RunOnMainThread<object>(() =>
+        {
+            var v = Godot.ProjectSettings.GetSetting(name);
+            return Server.Dict(("name", name), ("value", Godot.Variant.From(v).ToString()));
+        });
+    }
+
+    // ---------- 语言 ----------
+
+    private static (object? user, System.Reflection.PropertyInfo langProp) GetUserSettings()
+    {
+        var lsm = Type.GetType("GamesByMalcs.Melvor2.Settings.LocalSettingsManager, GamesByMalcs.Melvor2")
+            ?? throw new InvalidOperationException("LocalSettingsManager type not found");
+        var user = lsm.GetProperty("User", BindingFlags.Static | BindingFlags.Public)?.GetValue(null)
+            ?? throw new InvalidOperationException("LocalSettingsManager.User is null");
+        var langProp = user.GetType().GetProperty("Language")
+            ?? throw new InvalidOperationException("UserSettings.Language prop not found");
+        return (user, langProp);
+    }
+
+    public static object LanguageInfo()
+    {
+        return GameContext.RunOnMainThread<object>(() =>
+        {
+            var (user, langProp) = GetUserSettings();
+            var current = langProp.GetValue(user) as string;
+            var loaded = Godot.TranslationServer.GetLoadedLocales().ToList();
+            return Server.Dict(("current", current), ("loadedLocales", loaded));
+        });
+    }
+
+    public static object SetLanguage(string locale)
+    {
+        return GameContext.RunOnMainThread<object>(() =>
+        {
+            var (user, langProp) = GetUserSettings();
+            langProp.SetValue(user, locale);
+            var now = langProp.GetValue(user) as string;
+            return Server.Dict(("requested", locale), ("current", now),
+                ("ok", now == locale), ("activeLocale", Godot.TranslationServer.GetLocale()));
         });
     }
 
