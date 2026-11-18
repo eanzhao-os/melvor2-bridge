@@ -26,7 +26,7 @@ curl -s -m 3 http://127.0.0.1:27500/health
 - `{"bridge":"0.1.0","gameAttached":true}` → 可以直接开始
 - `gameAttached:false` → 游戏在主菜单/角色选择，需要进入存档（见下文"进入存档"）
 - 连接失败 → 游戏没以注入方式启动，需要运行：
-  `powershell -ExecutionPolicy Bypass -File "<本仓库>/dist/launch-melvor-bridge.ps1"`
+  `powershell -ExecutionPolicy Bypass -File "C:/Users/yiqi/Code/melvor2-bridge/dist/launch-melvor-bridge.ps1"`
   这条命令会关掉当前未注入的游戏进程并带注入重启——先告诉玩家、得到同意后再运行。（玩家在 Steam 里手动启动的游戏没有桥）
 
 ## API 速查（全部 JSON）
@@ -92,14 +92,9 @@ curl -s -X POST -d '{"locale":""}'       http://127.0.0.1:27500/language   # 自
 或用 CLI：`python melvor.py lang`（查询）/ `python melvor.py lang zh_CN`（切换）。
 玩家要求"调成中文/换语言"时直接用上面的命令；切换前简单告知玩家即可。
 
-**若 `loadedLocales` 里没有 `zh_CN`**（新装机器常见——翻译没注册）：
-在 `%APPDATA%/Games By Malcs/Melvor Idle 2/device_settings/override.cfg` 追加（保留文件已有的 `[display]` 等节）：
-```ini
-[internationalization]
+**翻译注册由桥自动完成**：桥每次随游戏启动时自动注册 `res://Locale/*.po` 全部翻译，并按存档保存的语言偏好恢复界面语言（无需任何配置文件；`device_settings/override.cfg` 追加法已废弃——游戏退出时会重写该文件把追加内容抹掉）。
 
-locale/translations=PackedStringArray("res://Locale/en_GB.po", "res://Locale/zh_CN.po", "res://Locale/fr.po")
-```
-然后重启游戏。`Language` 为空（自动）时跟随系统语言，无需再手动设置。
+例外：`gameAttached:false` 阶段（主菜单）语言也是生效的；若发现 `loadedLocales` 缺语言，先确认游戏是用注入方式启动的（桥在线即已注册）。
 
 **验证**：`GET /state` 的技能名变为中文（伐木/采矿/钓鱼…）即已生效。
 

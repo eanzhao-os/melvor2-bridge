@@ -133,17 +133,13 @@ dotnet run -- restore "<data目录>/GodotSharp.dll"
 ## 启用官方中文（EA 首发未开放，但资源已内置）
 
 游戏 PCK 内置了 `res://Locale/zh_CN.po`（另有 `fr.po`），但 `project.godot` 只注册了 `en_GB.po`，
-所以界面永远是英文。用 Godot 的设备级配置覆盖即可启用（不修改游戏文件）：
+所以原生界面永远是英文。
 
-在 `%APPDATA%/Games By Malcs/Melvor Idle 2/device_settings/override.cfg` 追加：
+**桥已内置自动修复**：每次随游戏启动时在主线程钩子里注册 `res://Locale/*.po` 全部翻译，
+并按存档保存的语言偏好（userSettings.json 的 Language）恢复界面语言。
+（曾用 `device_settings/override.cfg` 追加注册表的方法，但游戏退出时会重写该文件把追加内容抹掉，已废弃。）
 
-```ini
-[internationalization]
-
-locale/translations=PackedStringArray("res://Locale/en_GB.po", "res://Locale/zh_CN.po", "res://Locale/fr.po")
-```
-
-重启游戏即可。`Language` 设为自动（空）时跟随系统语言；也可用桥 `POST /language {"locale":"zh_CN"}` 显式切换（立即生效）。
+也可随时通过桥 `POST /language {"locale":"zh_CN"}` 显式切换（立即生效，无需重启）。
 
 ## 仓库内容声明
 

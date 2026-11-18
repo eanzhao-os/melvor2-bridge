@@ -31,6 +31,7 @@ public static class GameContext
     /// </summary>
     public static void OnNativeObjectCreated()
     {
+        EnsureTranslations();
         if (_connected) return;
         if (_connecting) return;
         _connecting = true;
@@ -82,6 +83,75 @@ public static class GameContext
     }
 
     private static bool _treeDumped;
+
+    /// <summary>
+    /// 运行时注册 PCK 内的全部翻译（res://Locale/*.po）。
+    /// 游戏默认只注册 en_GB.po；device_settings/override.cfg 的追加会被游戏重写抹掉，
+    /// 因此在桥启动时（主线程）注册，并按存档保存的语言偏好恢复界面语言。
+    /// </summary>
+    private static bool _translationsDone;
+    private static void EnsureTranslations()
+    {
+        if (_translationsDone) return;
+        _translationsDone = true;
+        try
+        {
+            // 1) 注册 PCK 内所有翻译
+            var pos = new List<string>();
+            var dir = Godot.DirAccess.Open("res://Locale");
+            if (dir != null)
+            {
+                dir.ListDirBegin();
+                while (dir.GetNext() is { } f && f.Length > 0)
+                    if (f.EndsWith(".po")) pos.Add($"res://Locale/{f}");
+                dir.ListDirEnd();
+            }
+            foreach (var po in pos)
+            {
+                if (Godot.ResourceLoader.Exists(po))
+                {
+                    var t = Godot.ResourceLoader.Load<Godot.Translation>(po);
+                    if (t != null) Godot.TranslationServer.AddTranslation(t);
+                }
+            }
+            Log.Write($"translations registered: {string.Join(",", Godot.TranslationServer.GetLoadedLocales())}");
+
+            // 2) 若游戏启动时因翻译缺失把语言回退成 en_GB，按存档偏好恢复
+            var lsm = Type.GetType("GamesByMalcs.Melvor2.Settings.LocalSettingsManager, GamesByMalcs.Melvor2");
+            var user = lsm?.GetProperty("User", BindingFlags.Static | BindingFlags.Public)?.GetValue(null);
+            var langProp = user?.GetType().GetProperty("Language");
+            string? saved = ReadSavedLanguagePreference();
+            if (!string.IsNullOrEmpty(saved) && saved != (langProp?.GetValue(user) as string)
+                && Godot.TranslationServer.GetLoadedLocales().Contains(saved))
+            {
+                langProp?.SetValue(user, saved);
+                Log.Write($"language restored to saved preference: {saved}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"EnsureTranslations failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>读取 userSettings.json 里保存的 Language（steam/&lt;id&gt;/userSettings.json）。</summary>
+    private static string? ReadSavedLanguagePreference()
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var baseDir = System.IO.Path.Combine(appData, "Games By Malcs", "Melvor Idle 2", "steam");
+            if (!System.IO.Directory.Exists(baseDir)) return null;
+            foreach (var f in System.IO.Directory.GetFiles(baseDir, "userSettings.json", System.IO.SearchOption.AllDirectories))
+            {
+                var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(f));
+                if (doc.RootElement.TryGetProperty("Language", out var lang) && lang.ValueKind == System.Text.Json.JsonValueKind.String)
+                    return lang.GetString();
+            }
+        }
+        catch { }
+        return null;
+    }
 
     /// <summary>用全部参数默认值调用实例方法（Godot API 大量使用默认参数）。</summary>
     private static object? InvokeWithDefaults(MethodInfo m, object? target)
